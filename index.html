@@ -39,11 +39,15 @@
     </script>
 
     <script id="fs" type="x-shader/fragment">
-      #extension GL_OES_standard_derivatives : enable
 
       uniform float time;
       uniform vec2 resolution;
       uniform vec2 mouse;
+
+mat2 rotate2d(float angle){
+    return mat2(cos(angle),-sin(angle),
+                sin(angle),cos(angle));
+}
 
       mat4 rotationMatrix(vec3 axis, float angle) {
       	 axis = normalize(axis);
@@ -62,6 +66,39 @@
        return (m * vec4(v, 1.0)).xyz;
       }
 
+      float random (in vec2 _st) {
+    return fract(sin(dot(_st.xy,
+                         vec2(12.9898,78.233)))*
+        43758.5453123);
+}
+
+// Based on Morgan McGuire @morgan3d
+// https://www.shadertoy.com/view/4dS3Wd
+float noise (in vec2 _st) {
+    vec2 i = floor(_st);
+    vec2 f = fract(_st);
+
+    // Four corners in 2D of a tile
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    return mix(a, b, u.x) +
+            (c - a)* u.y * (1.0 - u.x) +
+            (d - b) * u.x * u.y;
+}
+
+float lines(in vec2 pos, float b){
+    float scale = 10.0;
+    pos *= scale;
+    return smoothstep(0.0,
+                    .5+b*.5,
+                    abs((sin(pos.x*3.1415)+b*2.0))*.5);
+}
+
       float sphere (vec3 p) {
        return length(p) - 1.0;
       }
@@ -77,25 +114,44 @@
       return length(q)-t.y;
       }
 
+float sdOctahedron( vec3 p, float s)
+{
+  p = abs(p);
+  return (p.x+p.y+p.z-s)*0.57735027;
+}
+
 
     float opTwist(vec3 p )
     {
-        float k = clamp(0.7, 1.8, abs(sin(time))); // or some other amount
+        float k = clamp(0.3, 0.6, (sin(time) + 1.) * 0.5); // or some other amount
         float c = cos(k*p.y);
         float s = sin(k*p.y);
         mat2  m = mat2(c,-s,s,c);
         vec3  q = vec3(m*p.xz,p.y);
         return torus(q, vec2(0.8, 0.32));
+        // return box(q, vec3(0.5));
+        // return sphere(q);
+        // return sdOctahedron(q, 1.);
     }
 
 
+float opCheapBend(vec3 p )
+{
+    float k = clamp(0.2, 0.5, (sin(time * 0.7) + 1.) * 0.5); // or some other amount
+    float c = cos(k*p.x);
+    float s = sin(k*p.x);
+    mat2  m = mat2(c,-s,s,c);
+    vec3  q = vec3(m*p.xy,p.z);
+    return opTwist(q);
+}
+
       float scene(vec3 p) {
-       vec3 p1 = rotate(p, vec3(1., 0.6, 0.5), time * 0.7);
-       return opTwist(p1);
+       vec3 p1 = rotate(p, vec3(1., 0.6, 0.5), time * 0.9);
+       return opCheapBend(p1);
       }
 
       vec3 getNormal(vec3 p) {
-       vec2 o = vec2(0.003, 0.);
+       vec2 o = vec2(0.001, 0.);
        return normalize(vec3(
       	 scene(p + o.xyy) - scene(p - o.xyy),
       	 scene(p + o.yxy) - scene(p - o.yxy),
@@ -114,7 +170,10 @@
        float distance = length(p - vec2(0.5));
 
        // compute from mouse
-       vec3 light = vec3(-1., 1, 1.);
+       // x to right
+       // y to top
+       // z to viewer
+       vec3 light = vec3((mouse.x - resolution.x * 0.5) / resolution.x, (resolution.y - mouse.y - resolution.y * 0.5) / resolution.y, ((mouse.x - resolution.x * 0.5) / resolution.x) * 0.3 + 0.6);
 
        bool hit = false;
 
@@ -130,20 +189,41 @@
 
       	 rayPos = camPos + ray*rayLen;
 
-      	 if (abs(currDist) < 0.003) {
+      	 if (abs(currDist) < 0.001) {
       		 hit = true;
       		 break;
            }
-           // optimization since there is nothing 
-            if (currDist > 2.) {
+           // optimization since there is nothing
+            if (currDist > 4.) {
                 break;
             }
        }
 
+        // need to map these coordinates to another one
+       if(gl_FragCoord.x - mouse.x < 10. && mouse.x - gl_FragCoord.x < 10. && resolution.y - mouse.y - gl_FragCoord.y < 10. &&  gl_FragCoord.y - (resolution.y - mouse.y) < 10.) {
+          gl_FragColor = vec4(vec3(1.0), 1.0);
+       }
+
        if (hit) {
       	 vec3 n =  getNormal(rayPos);
-      	 float diff = clamp(0.3, 0.9,dot(light, n));
-      	 gl_FragColor = vec4(n * diff, 1.0);
+      	 float diff = clamp(0.2, 1.0, dot(light, n));
+      	 // float noiseVal = noise(gl_FragCoord.xy);
+      	 // vec3((abs(sin(time * 0.3))), abs(sin(time * 0.7)), abs((cos(time)))
+      	 gl_FragColor = vec4(diff * (vec3(n.xyz) + vec3(2.5)) * .4, 1.0);
+       } else {
+
+ vec2 st = gl_FragCoord.xy/resolution.xy;
+ st.y *= resolution.y/resolution.x;
+
+    vec2 pos = st.yx*vec2(10.,3.);
+            float pattern = pos.x;
+
+    // Add noise
+    pos = rotate2d( noise(pos * (mouse + vec2(10000., 20000.)) * (cos(time * 0.2) + 1.2) * .00002)) * pos;
+
+    // Draw lines
+    pattern = lines(pos,.5);
+         gl_FragColor = vec4(vec3(0.04, 0.05, (sin(time) + 1.) * 0.025) * pattern, 1.0);
        }
       }
     </script>
@@ -181,7 +261,9 @@
                 start_time: new Date().getTime(),
                 time: 0,
                 screenWidth: 0,
-                screenHeight: 0
+                screenHeight: 0,
+                mouseX: 0,
+                mouseY: 0,
             };
 
         init();
@@ -192,6 +274,10 @@
             fragment_shader = document.getElementById("fs").textContent;
 
             canvas = document.querySelector("canvas");
+
+            canvas.addEventListener("mousemove", function(event){
+                parameters.mouseX = event.pageX;
+                parameters.mouseY = event.pageY;});
 
             // Initialise WebGL
 
@@ -377,7 +463,8 @@
                 parameters.screenHeight
             );
 
-            gl.uniform2f(mouseLocation, 600, 600);
+            // console.log(parameters.mouseX)
+            gl.uniform2f(mouseLocation, parameters.mouseX * 2, parameters.mouseY * 2);
 
             // Render geometry
 
