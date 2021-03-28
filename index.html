@@ -253,6 +253,10 @@ void main(void) {
 </script>
 
 <script>
+    function isDesktop() {
+        return navigator.userAgent.match(/(iPad)|(iPhone)|(iPod)|(android)|(webOS)/i)
+    }
+
     function debounce(func, wait, immediate) {
         let timeout;
 
@@ -313,7 +317,7 @@ void main(void) {
             mouseX: 0,
             mouseY: 0,
             shape: 0,
-            hasBackground: navigator.userAgent.match(/(iPad)|(iPhone)|(iPod)|(android)|(webOS)/i) ? 0 : 1
+            hasBackground: isDesktop() ? 0 : 1
         };
 
     init();
@@ -327,9 +331,15 @@ void main(void) {
 
         window.addEventListener('resize', debounce(resizeCanvas, 100));
 
-        canvas.addEventListener("mousemove", function (event) {
+        canvas.addEventListener("mousemove", function () {
+            console.log(event)
             parameters.mouseX = event.pageX;
             parameters.mouseY = event.pageY;
+        });
+        canvas.addEventListener("touchmove", function (event) {
+            var touch = event.touches[0] || event.changedTouches[0];
+            parameters.mouseX = touch.pageX;
+            parameters.mouseY = touch.pageY;
         });
         canvas.addEventListener("click", function (event) {
             var shapesCount = 6;
@@ -452,7 +462,11 @@ void main(void) {
 
     function resizeCanvas() {
         // assume the device pixel ratio is 1 if the browser doesn't specify it
-        const devicePixelRatio = window.devicePixelRatio || 1;
+        let devicePixelRatio = window.devicePixelRatio || 1;
+
+        if (!isDesktop()) {
+            devicePixelRatio = Math.max(1.5, devicePixelRatio);
+        }
         // const devicePixelRatio = 1.5;
 
         // determine the 'backing store ratio' of the canvas context
