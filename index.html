@@ -4,6 +4,8 @@
 <head>
     <meta charset="utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <meta name='viewport'
+          content='width=device-width, initial-scale=1.0, maximum-scale=1.0,user-scalable=0'>
     <title>Animation via glsl distance functions</title>
 
     <style>
@@ -19,6 +21,9 @@
         canvas {
             width: 100%;
             height: 100%;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
         }
     </style>
 </head>
@@ -34,6 +39,7 @@
       	gl_Position = vec4( position, 1.0 );
 
       }
+
 
 
 
@@ -256,6 +262,7 @@ void main(void) {
         gl_FragColor = vec4(vec3(0.04, 0.05, (sin(time) + 1.) * 0.025) * pattern, 1.0);
     }
 }
+
 
 
 
