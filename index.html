@@ -331,8 +331,7 @@ void main(void) {
 
         window.addEventListener('resize', debounce(resizeCanvas, 100));
 
-        canvas.addEventListener("mousemove", function () {
-            console.log(event)
+        canvas.addEventListener("mousemove", function (event) {
             parameters.mouseX = event.pageX;
             parameters.mouseY = event.pageY;
         });
