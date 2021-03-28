@@ -224,7 +224,7 @@ void main(void) {
             break;
         }
         // optimization for too long rays from camera
-        if (currDist > 4.) {
+        if (currDist > 2.) {
             break;
         }
     }
@@ -233,7 +233,7 @@ void main(void) {
         vec3 n =  getNormal(rayPos);
         float diff = clamp(0.17, 1.0, dot(light, n));
         gl_FragColor = vec4(diff * (vec3(n.xyz) + vec3(2.)) * .5, 1.0);
-    } else if(hasBackground == 0) {
+    } else if(hasBackground == 1) {
 
         vec2 st = gl_FragCoord.xy/resolution.xy;
         st.y *= resolution.y/resolution.x;
@@ -497,7 +497,7 @@ void main(void) {
         // Set values to program variables
 
         gl.uniform1i(shapeLocation, parameters.shape);
-        gl.uniform1i(shapeLocation, parameters.hasBackground);
+        gl.uniform1i(hasBackgroundLocation, parameters.hasBackground);
         gl.uniform1f(timeLocation, parameters.time / 1000);
         gl.uniform2f(
             resolutionLocation,
