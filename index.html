@@ -227,11 +227,6 @@ void main(void) {
         }
     }
 
-    // need to map these coordinates to another one
-    if (gl_FragCoord.x - mouse.x < 10. && mouse.x - gl_FragCoord.x < 10. && resolution.y - mouse.y - gl_FragCoord.y < 10. &&  gl_FragCoord.y - (resolution.y - mouse.y) < 10.) {
-        gl_FragColor = vec4(vec3(1.0), 1.0);
-    }
-
     if (hit) {
         vec3 n =  getNormal(rayPos);
         float diff = clamp(0.17, 1.0, dot(light, n));
