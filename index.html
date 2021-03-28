@@ -2,9 +2,9 @@
 <html>
 
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <title>WebGL Boilerplate</title>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <title>Animation via glsl distance functions</title>
 
     <style>
         html,
@@ -24,11 +24,9 @@
 </head>
 
 <body>
-    <canvas></canvas>
-    <div id="info"></div>
+<canvas></canvas>
 
-    <script id="vs" type="x-shader/vertex">
-
+<script id="vs" type="x-shader/vertex">
       attribute vec3 position;
 
       void main() {
@@ -36,40 +34,40 @@
       	gl_Position = vec4( position, 1.0 );
 
       }
-    </script>
+</script>
 
-    <script id="fs" type="x-shader/fragment">
-
-      uniform float time;
-      uniform vec2 resolution;
-      uniform vec2 mouse;
+<script id="fs" type="x-shader/fragment">
+uniform float time;
+uniform vec2 resolution;
+uniform vec2 mouse;
+uniform int shape;
 
 mat2 rotate2d(float angle){
-    return mat2(cos(angle),-sin(angle),
-                sin(angle),cos(angle));
+    return mat2(cos(angle), -sin(angle),
+    sin(angle), cos(angle));
 }
 
-      mat4 rotationMatrix(vec3 axis, float angle) {
-      	 axis = normalize(axis);
-      	 float s = sin(angle);
-      	 float c = cos(angle);
-      	 float oc = 1.0 - c;
+mat4 rotationMatrix(vec3 axis, float angle) {
+    axis = normalize(axis);
+    float s = sin(angle);
+    float c = cos(angle);
+    float oc = 1.0 - c;
 
-      	 return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
-      							 oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
-      							 oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
-      							 0.0,                                0.0,                                0.0,                                1.0);
-      }
+    return mat4(oc * axis.x * axis.x + c, oc * axis.x * axis.y - axis.z * s, oc * axis.z * axis.x + axis.y * s, 0.0,
+    oc * axis.x * axis.y + axis.z * s, oc * axis.y * axis.y + c, oc * axis.y * axis.z - axis.x * s, 0.0,
+    oc * axis.z * axis.x - axis.y * s, oc * axis.y * axis.z + axis.x * s, oc * axis.z * axis.z + c, 0.0,
+    0.0, 0.0, 0.0, 1.0);
+}
 
-      vec3 rotate(vec3 v, vec3 axis, float angle) {
-       mat4 m = rotationMatrix(axis, angle);
-       return (m * vec4(v, 1.0)).xyz;
-      }
+vec3 rotate(vec3 v, vec3 axis, float angle) {
+    mat4 m = rotationMatrix(axis, angle);
+    return (m * vec4(v, 1.0)).xyz;
+}
 
-      float random (in vec2 _st) {
+float random (in vec2 _st) {
     return fract(sin(dot(_st.xy,
-                         vec2(12.9898,78.233)))*
-        43758.5453123);
+    vec2(12.9898, 78.233)))*
+    43758.5453123);
 }
 
 // Based on Morgan McGuire @morgan3d
@@ -87,394 +85,435 @@ float noise (in vec2 _st) {
     vec2 u = f * f * (3.0 - 2.0 * f);
 
     return mix(a, b, u.x) +
-            (c - a)* u.y * (1.0 - u.x) +
-            (d - b) * u.x * u.y;
+    (c - a)* u.y * (1.0 - u.x) +
+    (d - b) * u.x * u.y;
 }
 
 float lines(in vec2 pos, float b){
     float scale = 10.0;
     pos *= scale;
     return smoothstep(0.0,
-                    .5+b*.5,
-                    abs((sin(pos.x*3.1415)+b*2.0))*.5);
+    .5+b*.5,
+    abs((sin(pos.x*3.1415)+b*2.0))*.5);
 }
 
-      float sphere (vec3 p) {
-       return length(p) - 1.0;
-      }
+// <------ Distance functions ------>
+float box(vec3 p, vec3 b) {
+    vec3 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
 
-      float box(vec3 p , vec3 b) {
-       vec3 d = abs(p) - b;
-       return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
-      }
-
-      float torus( vec3 p, vec2 t )
-      {
-      vec2 q = vec2(length(p.xz)-t.x,p.y);
-      return length(q)-t.y;
-      }
-
-float sdOctahedron( vec3 p, float s)
+float torus(vec3 p, vec2 t)
 {
-  p = abs(p);
-  return (p.x+p.y+p.z-s)*0.57735027;
+    vec2 q = vec2(length(p.xz)-t.x, p.y);
+    return length(q)-t.y;
+}
+
+float sdOctahedron(vec3 p, float s)
+{
+    p = abs(p);
+    return (p.x+p.y+p.z-s)*0.57735027;
+}
+
+float sdBoxFrame(vec3 p, vec3 b, float e)
+{
+    p = abs(p)-b;
+    vec3 q = abs(p+e)-e;
+    return min(min(
+    length(max(vec3(p.x, q.y, q.z), 0.0))+min(max(p.x, max(q.y, q.z)), 0.0),
+    length(max(vec3(q.x, p.y, q.z), 0.0))+min(max(q.x, max(p.y, q.z)), 0.0)),
+    length(max(vec3(q.x, q.y, p.z), 0.0))+min(max(q.x, max(q.y, p.z)), 0.0));
+}
+
+float sdHexPrism(vec3 p, vec2 h)
+{
+    const vec3 k = vec3(-0.8660254, 0.5, 0.57735);
+    p = abs(p);
+    p.xy -= 2.0*min(dot(k.xy, p.xy), 0.0)*k.xy;
+    vec2 d = vec2(
+    length(p.xy-vec2(clamp(p.x, -k.z*h.x, k.z*h.x), h.x))*sign(p.y-h.x),
+    p.z-h.y);
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
+float sdRoundBox(vec3 p, vec3 b, float r)
+{
+    vec3 q = abs(p) - b;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+}
+
+float sdTriPrism(vec3 p, vec2 h)
+{
+    vec3 q = abs(p);
+    return max(q.z-h.y, max(q.x*0.866025+p.y*0.5, -p.y)-h.x*0.5);
 }
 
 
-    float opTwist(vec3 p )
-    {
-        float k = clamp(0.3, 0.6, (sin(time) + 1.) * 0.5); // or some other amount
-        float c = cos(k*p.y);
-        float s = sin(k*p.y);
-        mat2  m = mat2(c,-s,s,c);
-        vec3  q = vec3(m*p.xz,p.y);
+float opTwist(vec3 p)
+{
+    float k = clamp(0.3, 0.6, (sin(time) + 1.) * 0.5);
+    float c = cos(k*p.y);
+    float s = sin(k*p.y);
+    mat2  m = mat2(c, -s, s, c);
+    vec3  q = vec3(m*p.xz, p.y);
+
+    if (shape == 0) {
         return torus(q, vec2(0.8, 0.32));
-        // return box(q, vec3(0.5));
-        // return sphere(q);
-        // return sdOctahedron(q, 1.);
+    }
+    if (shape == 1) {
+        return box(q, vec3(0.5));
+    }
+    if (shape == 2) {
+        return sdHexPrism(q, vec2(0.5, 0.75));
+    }
+    if (shape == 3) {
+        return sdRoundBox(q, vec3(0.4), mix(0.15, 0.25, abs(sin(time))));
+    }
+    if (shape == 4) {
+        return sdTriPrism(q, vec2(0.5, 0.8));
+    }
+    return sdOctahedron(q, 1.);
+}
+
+
+
+float scene(vec3 p) {
+    vec3 p1 = rotate(p, vec3(1., 0.6, 0.5), time * 0.85);
+    return opTwist(p1);
+}
+
+vec3 getNormal(vec3 p) {
+    vec2 o = vec2(0.001, 0.);
+    return normalize(vec3(
+        scene(p + o.xyy) - scene(p - o.xyy),
+        scene(p + o.yxy) - scene(p - o.yxy),
+        scene(p + o.yyx) - scene(p - o.yyx)
+    ));
+}
+
+void main(void) {
+
+    vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / resolution.y;
+
+    vec3 camPos = vec3(0., 0., 2.);
+
+    vec3 ray = normalize(vec3(p, -1.));
+
+    float distance = length(p - vec2(0.5));
+
+    vec3 light = vec3((mouse.x - resolution.x * 0.5) / resolution.x, (resolution.y - mouse.y - resolution.y * 0.5) / resolution.y, ((mouse.x - resolution.x * 0.5) / resolution.x) * 0.3 + 0.6);
+
+    bool hit = false;
+
+    float currDist = 0.;
+
+    float rayLen = 0.;
+
+    vec3 rayPos = camPos;
+
+    for (int i = 0; i <= 64; i++) {
+        currDist = scene(rayPos);
+        rayLen += currDist;
+
+        rayPos = camPos + ray*rayLen;
+
+        if (abs(currDist) < 0.001) {
+            hit = true;
+            break;
+        }
+        // optimization for too long rays from camera
+        if (currDist > 4.) {
+            break;
+        }
     }
 
+    // need to map these coordinates to another one
+    if (gl_FragCoord.x - mouse.x < 10. && mouse.x - gl_FragCoord.x < 10. && resolution.y - mouse.y - gl_FragCoord.y < 10. &&  gl_FragCoord.y - (resolution.y - mouse.y) < 10.) {
+        gl_FragColor = vec4(vec3(1.0), 1.0);
+    }
 
-float opCheapBend(vec3 p )
-{
-    float k = clamp(0.2, 0.5, (sin(time * 0.7) + 1.) * 0.5); // or some other amount
-    float c = cos(k*p.x);
-    float s = sin(k*p.x);
-    mat2  m = mat2(c,-s,s,c);
-    vec3  q = vec3(m*p.xy,p.z);
-    return opTwist(q);
+    if (hit) {
+        vec3 n =  getNormal(rayPos);
+        float diff = clamp(0.17, 1.0, dot(light, n));
+        gl_FragColor = vec4(diff * (vec3(n.xyz) + vec3(2.)) * .5, 1.0);
+    } else {
+
+        vec2 st = gl_FragCoord.xy/resolution.xy;
+        st.y *= resolution.y/resolution.x;
+
+        vec2 pos = st.yx*vec2(10., 3.);
+        float pattern = pos.x;
+
+        // Add noise
+        pos = rotate2d(noise(pos * (mouse + vec2(10000., 20000.)) * (cos(time * 0.2) + 1.2) * .00002)) * pos;
+
+        // Draw lines
+        pattern = lines(pos, .5);
+        gl_FragColor = vec4(vec3(0.04, 0.05, (sin(time) + 1.) * 0.025) * pattern, 1.0);
+    }
 }
 
-      float scene(vec3 p) {
-       vec3 p1 = rotate(p, vec3(1., 0.6, 0.5), time * 0.9);
-       return opCheapBend(p1);
-      }
+</script>
 
-      vec3 getNormal(vec3 p) {
-       vec2 o = vec2(0.001, 0.);
-       return normalize(vec3(
-      	 scene(p + o.xyy) - scene(p - o.xyy),
-      	 scene(p + o.yxy) - scene(p - o.yxy),
-      	 scene(p + o.yyx) - scene(p - o.yyx)
-       ));
-      }
+<script>
+    function debounce(func, wait, immediate) {
+        let timeout;
 
-      void main( void ) {
+        return function executedFunction() {
+            const context = this;
+            const args = arguments;
 
-       vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / resolution.y;
-
-       vec3 camPos = vec3(0., 0., 2.);
-
-       vec3 ray = normalize(vec3(p, -1.));
-
-       float distance = length(p - vec2(0.5));
-
-       // compute from mouse
-       // x to right
-       // y to top
-       // z to viewer
-       vec3 light = vec3((mouse.x - resolution.x * 0.5) / resolution.x, (resolution.y - mouse.y - resolution.y * 0.5) / resolution.y, ((mouse.x - resolution.x * 0.5) / resolution.x) * 0.3 + 0.6);
-
-       bool hit = false;
-
-       float currDist = 0.;
-
-       float rayLen = 0.;
-
-       vec3 rayPos = camPos;
-
-       for(int i = 0; i <= 64; i++) {
-      	 currDist = scene(rayPos);
-      	 rayLen += currDist;
-
-      	 rayPos = camPos + ray*rayLen;
-
-      	 if (abs(currDist) < 0.001) {
-      		 hit = true;
-      		 break;
-           }
-           // optimization since there is nothing
-            if (currDist > 4.) {
-                break;
-            }
-       }
-
-        // need to map these coordinates to another one
-       if(gl_FragCoord.x - mouse.x < 10. && mouse.x - gl_FragCoord.x < 10. && resolution.y - mouse.y - gl_FragCoord.y < 10. &&  gl_FragCoord.y - (resolution.y - mouse.y) < 10.) {
-          gl_FragColor = vec4(vec3(1.0), 1.0);
-       }
-
-       if (hit) {
-      	 vec3 n =  getNormal(rayPos);
-      	 float diff = clamp(0.2, 1.0, dot(light, n));
-      	 // float noiseVal = noise(gl_FragCoord.xy);
-      	 // vec3((abs(sin(time * 0.3))), abs(sin(time * 0.7)), abs((cos(time)))
-      	 gl_FragColor = vec4(diff * (vec3(n.xyz) + vec3(2.5)) * .4, 1.0);
-       } else {
-
- vec2 st = gl_FragCoord.xy/resolution.xy;
- st.y *= resolution.y/resolution.x;
-
-    vec2 pos = st.yx*vec2(10.,3.);
-            float pattern = pos.x;
-
-    // Add noise
-    pos = rotate2d( noise(pos * (mouse + vec2(10000., 20000.)) * (cos(time * 0.2) + 1.2) * .00002)) * pos;
-
-    // Draw lines
-    pattern = lines(pos,.5);
-         gl_FragColor = vec4(vec3(0.04, 0.05, (sin(time) + 1.) * 0.025) * pattern, 1.0);
-       }
-      }
-    </script>
-
-    <script>
-        /**
-         * Provides requestAnimationFrame in a cross browser way.
-         * paulirish.com/2011/requestanimationframe-for-smart-animating/
-         */
-        window.requestAnimationFrame =
-            window.requestAnimationFrame ||
-            (function () {
-                return (
-                    window.webkitRequestAnimationFrame ||
-                    window.mozRequestAnimationFrame ||
-                    window.oRequestAnimationFrame ||
-                    window.msRequestAnimationFrame ||
-                    function (callback, element) {
-                        window.setTimeout(callback, 1000 / 60);
-                    }
-                );
-            })();
-
-        var canvas,
-            gl,
-            buffer,
-            vertex_shader,
-            fragment_shader,
-            currentProgram,
-            vertex_position,
-            timeLocation,
-            resolutionLocation,
-            mouseLocation,
-            parameters = {
-                start_time: new Date().getTime(),
-                time: 0,
-                screenWidth: 0,
-                screenHeight: 0,
-                mouseX: 0,
-                mouseY: 0,
+            const later = function () {
+                timeout = null;
+                if (!immediate) func.apply(context, args);
             };
 
-        init();
-        animate();
+            const callNow = immediate && !timeout;
 
-        function init() {
-            vertex_shader = document.getElementById("vs").textContent;
-            fragment_shader = document.getElementById("fs").textContent;
+            clearTimeout(timeout);
 
-            canvas = document.querySelector("canvas");
+            timeout = setTimeout(later, wait);
 
-            canvas.addEventListener("mousemove", function(event){
-                parameters.mouseX = event.pageX;
-                parameters.mouseY = event.pageY;});
+            if (callNow) func.apply(context, args);
+        };
+    }
 
-            // Initialise WebGL
+    /**
+     * Provides requestAnimationFrame in a cross browser way.
+     * paulirish.com/2011/requestanimationframe-for-smart-animating/
+     */
+    window.requestAnimationFrame =
+        window.requestAnimationFrame ||
+        (function () {
+            return (
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.oRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function (callback, element) {
+                    window.setTimeout(callback, 1000 / 60);
+                }
+            );
+        })();
 
-            try {
-                gl = canvas.getContext("experimental-webgl");
-            } catch (error) { }
+    var canvas,
+        gl,
+        buffer,
+        vertex_shader,
+        fragment_shader,
+        currentProgram,
+        vertex_position,
+        timeLocation,
+        resolutionLocation,
+        mouseLocation,
+        shapeLocation,
+        parameters = {
+            start_time: new Date().getTime(),
+            time: 0,
+            screenWidth: 0,
+            screenHeight: 0,
+            mouseX: 0,
+            mouseY: 0,
+            shape: 0,
+        };
 
-            if (!gl) {
-                throw "cannot create webgl context";
-            }
+    init();
+    animate();
 
-            // Create Vertex buffer (2 triangles)
+    function init() {
+        vertex_shader = document.getElementById("vs").textContent;
+        fragment_shader = document.getElementById("fs").textContent;
 
-            buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.bufferData(
-                gl.ARRAY_BUFFER,
-                new Float32Array([
-                    -1.0,
-                    -1.0,
-                    1.0,
-                    -1.0,
-                    -1.0,
-                    1.0,
-                    1.0,
-                    -1.0,
-                    1.0,
-                    1.0,
-                    -1.0,
-                    1.0
-                ]),
-                gl.STATIC_DRAW
+        canvas = document.querySelector("canvas");
+
+        window.addEventListener('resize', debounce(resizeCanvas, 100));
+
+        canvas.addEventListener("mousemove", function (event) {
+            parameters.mouseX = event.pageX;
+            parameters.mouseY = event.pageY;
+        });
+        canvas.addEventListener("click", function (event) {
+            var shapesCount = 6;
+            var newShape;
+            do {
+                newShape = Math.floor(Math.random() * shapesCount);
+            } while (parameters.shape === newShape)
+            parameters.shape = newShape;
+        });
+
+        // Initialise WebGL
+
+        try {
+            gl = canvas.getContext("experimental-webgl");
+        } catch (error) {
+        }
+
+        if (!gl) {
+            throw "cannot create webgl context";
+        }
+
+        // Create Vertex buffer (2 triangles)
+
+        buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array([
+                -1.0,
+                -1.0,
+                1.0,
+                -1.0,
+                -1.0,
+                1.0,
+                1.0,
+                -1.0,
+                1.0,
+                1.0,
+                -1.0,
+                1.0
+            ]),
+            gl.STATIC_DRAW
+        );
+
+        // Create Program
+
+        currentProgram = createProgram(vertex_shader, fragment_shader);
+
+        timeLocation = gl.getUniformLocation(currentProgram, "time");
+        resolutionLocation = gl.getUniformLocation(
+            currentProgram,
+            "resolution"
+        );
+        mouseLocation = gl.getUniformLocation(
+            currentProgram,
+            "mouse"
+        );
+        shapeLocation = gl.getUniformLocation(currentProgram, "shape");
+    }
+
+    function createProgram(vertex, fragment) {
+        var program = gl.createProgram();
+
+        var vs = createShader(vertex, gl.VERTEX_SHADER);
+        var fs = createShader(
+            "#ifdef GL_ES\nprecision highp float;\n#endif\n\n" + fragment,
+            gl.FRAGMENT_SHADER
+        );
+
+        if (vs == null || fs == null) return null;
+
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            alert(
+                "ERROR:\n" +
+                "VALIDATE_STATUS: " +
+                gl.getProgramParameter(program, gl.VALIDATE_STATUS) +
+                "\n" +
+                "ERROR: " +
+                gl.getError() +
+                "\n\n" +
+                "- Vertex Shader -\n" +
+                vertex +
+                "\n\n" +
+                "- Fragment Shader -\n" +
+                fragment
             );
 
-            // Create Program
+            return null;
+        }
 
-            currentProgram = createProgram(vertex_shader, fragment_shader);
+        return program;
+    }
 
-            timeLocation = gl.getUniformLocation(currentProgram, "time");
-            resolutionLocation = gl.getUniformLocation(
-                currentProgram,
-                "resolution"
+    function createShader(src, type) {
+        var shader = gl.createShader(type);
+
+        gl.shaderSource(shader, src);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(
+                (type == gl.VERTEX_SHADER ? "VERTEX" : "FRAGMENT") +
+                " SHADER:\n" +
+                gl.getShaderInfoLog(shader)
             );
-            mouseLocation = gl.getUniformLocation(
-                currentProgram,
-                "mouse"
-            );
+            return null;
         }
 
-        function createProgram(vertex, fragment) {
-            var program = gl.createProgram();
+        return shader;
+    }
 
-            var vs = createShader(vertex, gl.VERTEX_SHADER);
-            var fs = createShader(
-                "#ifdef GL_ES\nprecision highp float;\n#endif\n\n" + fragment,
-                gl.FRAGMENT_SHADER
-            );
+    function resizeCanvas() {
+        // assume the device pixel ratio is 1 if the browser doesn't specify it
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        // const devicePixelRatio = 1.5;
 
-            if (vs == null || fs == null) return null;
+        // determine the 'backing store ratio' of the canvas context
+        const backingStoreRatio = 1;
 
-            gl.attachShader(program, vs);
-            gl.attachShader(program, fs);
+        // determine the actual ratio we want to draw at
+        const ratio = devicePixelRatio / backingStoreRatio;
 
-            gl.deleteShader(vs);
-            gl.deleteShader(fs);
+        if (devicePixelRatio !== backingStoreRatio) {
+            canvas.width = document.body.clientWidth * ratio;
+            canvas.height = document.body.clientHeight * ratio;
 
-            gl.linkProgram(program);
+            canvas.style.width = document.body.clientWidth + 'px';
+            canvas.style.height = document.body.clientHeight + 'px';
 
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                alert(
-                    "ERROR:\n" +
-                    "VALIDATE_STATUS: " +
-                    gl.getProgramParameter(program, gl.VALIDATE_STATUS) +
-                    "\n" +
-                    "ERROR: " +
-                    gl.getError() +
-                    "\n\n" +
-                    "- Vertex Shader -\n" +
-                    vertex +
-                    "\n\n" +
-                    "- Fragment Shader -\n" +
-                    fragment
-                );
+            parameters.screenWidth = canvas.width;
+            parameters.screenHeight = canvas.height;
+            gl.viewport(0, 0, document.body.clientWidth * ratio, document.body.clientHeight * ratio);
 
-                return null;
-            }
-
-            return program;
         }
+    }
 
-        function createShader(src, type) {
-            var shader = gl.createShader(type);
+    function animate() {
+        render();
+        requestAnimationFrame(animate);
+    }
 
-            gl.shaderSource(shader, src);
-            gl.compileShader(shader);
+    resizeCanvas();
 
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                alert(
-                    (type == gl.VERTEX_SHADER ? "VERTEX" : "FRAGMENT") +
-                    " SHADER:\n" +
-                    gl.getShaderInfoLog(shader)
-                );
-                return null;
-            }
+    function render() {
+        if (!currentProgram) return;
 
-            return shader;
-        }
+        parameters.time = new Date().getTime() - parameters.start_time;
 
-        function resizeCanvas() {
-            if (
-                canvas.width != canvas.clientWidth ||
-                canvas.height != canvas.clientHeight
-            ) {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-                parameters.screenWidth = canvas.width;
-                parameters.screenHeight = canvas.height;
+        // Load program into GPU
 
-                gl.viewport(0, 0, canvas.width, canvas.height);
-            }
-        }
+        gl.useProgram(currentProgram);
 
-        function resizeCanvas() {
-            // assume the device pixel ratio is 1 if the browser doesn't specify it
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            // const devicePixelRatio = 1.5;
+        // Set values to program variables
 
-            // determine the 'backing store ratio' of the canvas context
-            const backingStoreRatio = 1;
+        gl.uniform1i(shapeLocation, parameters.shape);
+        gl.uniform1f(timeLocation, parameters.time / 1000);
+        gl.uniform2f(
+            resolutionLocation,
+            parameters.screenWidth,
+            parameters.screenHeight
+        );
 
-            // determine the actual ratio we want to draw at
-            const ratio = devicePixelRatio / backingStoreRatio;
+        gl.uniform2f(mouseLocation, parameters.mouseX * 2, parameters.mouseY * 2);
 
-            if (devicePixelRatio !== backingStoreRatio) {
-                canvas.width = canvas.clientWidth * ratio;
-                canvas.height = canvas.clientHeight * ratio;
+        // Render geometry
 
-                canvas.style.width = canvas.clientWidth + 'px';
-                canvas.style.height = canvas.clientHeight + 'px';
-
-                parameters.screenWidth = canvas.width;
-                parameters.screenHeight = canvas.height;
-                gl.viewport(0, 0, canvas.width * ratio, canvas.height * ratio);
-
-            }
-            // else {
-            //     // this is a normal 1:1 device; just scale it simply
-            //     canvas.width = window.width;
-            //     canvas.height = window.height;
-            //     canvas.style.width = '';
-            //     canvas.style.height = '';
-
-            // }
-
-            // scale the drawing context so everything will work at the higher ratio
-            // gl.viewport(0, 0, canvas.width * ratio, canvas.height * ratio);
-        }
-
-        function animate() {
-            render();
-            requestAnimationFrame(animate);
-        }
-        resizeCanvas();
-
-        function render() {
-            if (!currentProgram) return;
-
-            parameters.time = new Date().getTime() - parameters.start_time;
-
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-            // Load program into GPU
-
-            gl.useProgram(currentProgram);
-
-            // Set values to program variables
-
-            gl.uniform1f(timeLocation, parameters.time / 1000);
-            gl.uniform2f(
-                resolutionLocation,
-                parameters.screenWidth,
-                parameters.screenHeight
-            );
-
-            // console.log(parameters.mouseX)
-            gl.uniform2f(mouseLocation, parameters.mouseX * 2, parameters.mouseY * 2);
-
-            // Render geometry
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.vertexAttribPointer(vertex_position, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(vertex_position);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-            gl.disableVertexAttribArray(vertex_position);
-        }
-    </script>
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.vertexAttribPointer(vertex_position, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vertex_position);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disableVertexAttribArray(vertex_position);
+    }
+</script>
 </body>
 
 </html>
